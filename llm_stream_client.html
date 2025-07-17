@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RAG Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            resize: vertical;
+        }
+        
+        #result {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 20px 0;
+            min-height: 100px;
+            background-color: #f9f9f9;
+            white-space: pre-wrap;
+        }
+        
+        #recommendations {
+            margin-top: 20px;
+        }
+        
+        .recommendation-btn {
+            display: block;
+            width: 100%;
+            margin: 5px 0;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: left;
+        }
+        
+        .recommendation-btn:hover {
+            background-color: #0056b3;
+        }
+        
+        #fetchButton {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            margin-right: 10px;
+        }
+        
+        #fetchButton:hover {
+            background-color: #218838;
+        }
+        
+        #fetchButton:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        #newChatButton {
+            padding: 10px 20px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        #newChatButton:hover {
+            background-color: #c82333;
+        }
+        
+        .conversation-history {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #f8f9fa;
+        }
+        
+        .history-item {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .user-message {
+            color: #007bff;
+            font-weight: bold;
+        }
+        
+        .ai-message {
+            color: #28a745;
+            margin-top: 5px;
+        }
+        
+        .button-container {
+            margin-bottom: 15px;
+        }
+        
+        .status-info {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>RAG 답변 생성기</h1>
+    
+    <div class="status-info">
+        대화 상태: <span id="chatStatus">연결됨</span> | 
+        총 메시지: <span id="messageCount">0</span>개
+    </div>
+    
+    
+    <textarea id="queryInput" placeholder="여기에 질문을 입력하세요..."></textarea>
+    <div class="button-container">
+        <button id="fetchButton">답변 생성</button>
+        <button id="newChatButton">새 채팅</button>
+    </div>
+    
+    <h2>생성된 답변:</h2>
+    <div id="result"></div>
+    
+    <div id="recommendations">
+        <h3>추천 프롬프트</h3>
+        <div id="recommendationButtons"></div>
+    </div>
+
+    <div id="conversationHistory" class="conversation-history" style="display: none;">
+        <h4>대화 히스토리</h4>
+        <div id="historyContent"></div>
+    </div>
+
+    <script>
+        // 클라이언트에서 대화 히스토리 관리
+        let localChatHistory = [];
+        
+        // 페이지 로드 시 로컬 히스토리 표시
+        window.onload = function() {
+            updateLocalChatHistory();
+        };
+        
+        function clearChatHistory() {
+            fetch("http://127.0.0.1:8001/clear-history", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // 서버와 클라이언트 모두 초기화
+                localChatHistory = [];
+                
+                // 화면 초기화
+                document.getElementById('result').innerHTML = '';
+                document.getElementById('recommendationButtons').innerHTML = '';
+                document.getElementById('historyContent').innerHTML = '';
+                document.getElementById('conversationHistory').style.display = 'none';
+                document.getElementById('queryInput').value = '';
+                document.getElementById('messageCount').textContent = '0';
+                document.getElementById('chatStatus').textContent = '새 대화 시작됨';
+                
+                console.log(data.message);
+            })
+            .catch(error => {
+                console.error('대화 히스토리 초기화 실패:', error);
+                document.getElementById('chatStatus').textContent = '오류 발생';
+            });
+        }
+        
+        function updateLocalChatHistory() {
+            const historyContent = document.getElementById('historyContent');
+            const conversationHistory = document.getElementById('conversationHistory');
+            const messageCount = document.getElementById('messageCount');
+            
+            messageCount.textContent = localChatHistory.length;
+            
+            if (localChatHistory.length > 0) {
+                historyContent.innerHTML = '';
+                
+                // 메시지를 쌍으로 처리 (사용자 + AI)
+                for (let i = 0; i < localChatHistory.length; i += 2) {
+                    if (i + 1 < localChatHistory.length) {
+                        const userMsg = localChatHistory[i];
+                        const aiMsg = localChatHistory[i + 1];
+                        
+                        const historyItem = document.createElement('div');
+                        historyItem.className = 'history-item';
+                        historyItem.innerHTML = `
+                            <div class="user-message">사용자: ${userMsg.content}</div>
+                            <div class="ai-message">AI: ${aiMsg.content}</div>
+                        `;
+                        historyContent.appendChild(historyItem);
+                    }
+                }
+                conversationHistory.style.display = 'block';
+            } else {
+                conversationHistory.style.display = 'none';
+            }
+            
+            document.getElementById('chatStatus').textContent = '연결됨';
+        }
+
+        function sendQuery(query, selectedOption = null) {
+            const resultDiv = document.getElementById('result');
+            const recommendationDiv = document.getElementById('recommendationButtons');
+            const fetchButton = document.getElementById('fetchButton');
+
+            // 이전 결과 초기화 및 버튼 비활성화
+            resultDiv.innerHTML = '';
+            recommendationDiv.innerHTML = '';
+            fetchButton.disabled = true;
+            fetchButton.textContent = '생성 중...';
+            document.getElementById('chatStatus').textContent = '응답 생성 중...';
+            
+            // 사용자 메시지를 히스토리에 추가
+            const userQuery = selectedOption ? `${query}\n\n추가 요청: ${selectedOption}` : query;
+            localChatHistory.push({
+                type: "human",
+                content: userQuery
+            });
+            
+            let buffer = ''; // 불완전한 JSON 라인을 위한 버퍼
+            let aiResponse = ''; // AI 응답을 누적할 변수
+
+            const requestBody = {
+                query: query
+            };
+            
+            if (selectedOption) {
+                requestBody.selected_option = selectedOption;
+            }
+
+            fetch("http://127.0.0.1:8001/rag-query", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            })
+            .then((response) => {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+
+                function processStream({ done, value }) {
+                    if (done) {
+                        // 스트림 완료 시 남은 버퍼 처리 및 버튼 활성화
+                        if (buffer.trim()) {
+                            processLine(buffer.trim());
+                        }
+                        
+                        // AI 응답을 히스토리에 추가
+                        if (aiResponse.trim()) {
+                            localChatHistory.push({
+                                type: "ai", 
+                                content: aiResponse.trim()
+                            });
+                        }
+                        
+                        fetchButton.disabled = false;
+                        fetchButton.textContent = '답변 생성';
+                        
+                        // 로컬 대화 히스토리 업데이트
+                        updateLocalChatHistory();
+                        return;
+                    }
+
+                    // 새로운 데이터를 버퍼에 추가
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    // 완성된 라인들을 처리
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // 마지막 불완전한 라인은 버퍼에 보관
+                    
+                    lines.forEach(line => {
+                        if (line.trim()) {
+                            processLine(line.trim());
+                        }
+                    });
+
+                    return reader.read().then(processStream);
+                }
+
+                function processLine(line) {
+                    try {
+                        const data = JSON.parse(line);
+                        
+                        if (data.type === 'token') {
+                            // 토큰을 실시간으로 답변 영역에 추가
+                            resultDiv.innerHTML += data.content;
+                            // AI 응답 누적
+                            aiResponse += data.content;
+                        } else if (data.type === 'recommendations') {
+                            // 추천 프롬프트를 버튼으로 생성
+                            data.data.forEach(recommendation => {
+                                const button = document.createElement('button');
+                                button.className = 'recommendation-btn';
+                                button.textContent = recommendation;
+                                button.onclick = () => {
+                                    document.getElementById('queryInput').value = recommendation;
+                                    sendQuery(recommendation);
+                                };
+                                recommendationDiv.appendChild(button);
+                            });
+                        } else if (data.type === 'error') {
+                            resultDiv.innerHTML = data.content;
+                            document.getElementById('chatStatus').textContent = '오류 발생';
+                        }
+                    } catch (e) {
+                        console.error('JSON 파싱 오류:', e, 'Line:', line);
+                    }
+                }
+
+                return reader.read().then(processStream);
+            })
+            .catch(error => {
+                console.error('Error fetching data:', error);
+                resultDiv.innerHTML = '데이터를 가져오는 중 오류가 발생했습니다.';
+                fetchButton.disabled = false;
+                fetchButton.textContent = '답변 생성';
+                document.getElementById('chatStatus').textContent = '연결 오류';
+            });
+        }
+
+        document.getElementById('fetchButton').addEventListener('click', () => {
+            const queryInput = document.getElementById('queryInput');
+            const query = queryInput.value.trim();
+
+            if (!query) {
+                document.getElementById('result').innerHTML = '질문을 입력해주세요.';
+                return;
+            }
+
+            sendQuery(query);
+        });
+        
+        document.getElementById('newChatButton').addEventListener('click', () => {
+            clearChatHistory();
+        });
+
+        // 답변 생성 Enter 키 이벤트 처리
+        document.getElementById('queryInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                document.getElementById('fetchButton').click();
+            }
+        });
+    </script>
+</body>
+</html>
