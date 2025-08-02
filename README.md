@@ -15,10 +15,12 @@ ChatOllama를 활용한 **실시간 스트리밍 AI 채팅** 웹 애플리케이
 - 메모리 효율적인 자동 히스토리 정리
 
 ### **추천 프롬프트 시스템**
-- 응답 완료 후 고정된 추천 프롬프트 자동 제공:
-  - "더 구체적으로 답변해 주세요."
-  - "다른 의견도 듣고 싶어요."
-  - "짧게 요약해 주세요."
+- 응답 완료 후 LLM을 통해 추가적인 추천 프롬프트 생성 및 사용자에게 제공:
+  - ex)
+  - 어떤 정보를 원하시는지 예시를 들어 설명해주실 수 있나요?
+  - 특정 주제나 분야가 있으신가요?
+  - 궁금한 점을 조금 더 자세히 말씀해주시면 관련 내용을 상세하게 안내해드릴 수 있습니다
+
 
 ### **새 채팅 기능**
 - "새 채팅" 버튼으로 서버와 클라이언트 대화 히스토리 동시 초기화
@@ -65,9 +67,16 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama pull hf.co/MLP-KTLim/llama-3-Korean-Bllossom-8B-gguf-Q4_K_M:Q4_K_M
 ```
 
-### 2. **Python 패키지 설치**
+### 2. **uv 설치 및 프로젝트 설정**
 ```bash
-pip install fastapi uvicorn langchain-community
+# uv 설치 (https://docs.astral.sh/uv/getting-started/installation/)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 또는 pip를 사용하여 설치
+pip install uv
+
+# 프로젝트 의존성 설치
+uv sync
 ```
 
 ## 설치 및 실행
@@ -80,12 +89,24 @@ cd fastapi_llm_streaming
 
 ### 2. **서버 실행**
 ```bash
-python llm_stream_server.py
+uv run python llm_stream_server.py
 ```
 - 서버가 `http://localhost:8001`에서 실행됩니다.
 
 ### 3. **클라이언트 실행**
 - 웹 브라우저에서 `llm_stream_client.html` 파일을 직접 열어 테스트합니다.
+
+## 개발 도구
+
+### **uv 명령어**
+```bash
+uv sync            # 의존성 동기화
+uv sync --dev      # 개발 의존성 포함 동기화
+uv run python      # 가상환경에서 Python 실행
+uv add package     # 새 패키지 추가
+uv add --dev package  # 새 개발 패키지 추가
+uv lock --upgrade  # 의존성 업그레이드
+```
 
 
 ## 라이선스

@@ -1,0 +1,16 @@
+[project]
+name = "fastapi-llm-streaming"
+version = "0.1.0"
+description = "ChatOllama를 활용한 실시간 스트리밍 AI 채팅 웹 애플리케이션"
+authors = [
+    {name = "hwantage", email = "hwantagexsw2@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "langchain-ollama>=0.1.0",
+    "langchain-core>=0.1.0",
+    "pydantic>=2.0.0",
+]
