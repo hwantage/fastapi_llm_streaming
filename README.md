@@ -108,6 +108,9 @@ uv add --dev package  # 새 개발 패키지 추가
 uv lock --upgrade  # 의존성 업그레이드
 ```
 
+## DeepWiki
+
+https://deepwiki.com/hwantage/fastapi_llm_streaming
 
 ## 라이선스
 
